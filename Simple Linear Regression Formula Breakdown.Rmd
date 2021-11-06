@@ -1,0 +1,163 @@
+---
+title: "Simple Regression Linear"
+author: "Agnes Septilia"
+date: "5/11/2021"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+## INTRODUCTION
+
+In this program we will learn about how to make Simple Linear Regression, by breaking down to each formula.
+
+First, we will start from making the dataset dummy
+
+```{r}
+# define x value as predictor
+predictor <- c(15, 20, 25, 37, 40, 45, 48, 50, 55, 61, 64, 67, 70)
+
+# define y value as target
+target <- c(100, 135, 135, 150, 250, 270, 290, 360, 375, 400, 500, 600, 700)
+
+# set as dataframe
+df <- data.frame(x = predictor, y = target)
+df
+```
+**PART 1 : FIND THE REGRESSION FORMULA**
+
+In Linear Regression, the first information we have to check is the prediction formula : y = a + bx
+```{r}
+# Start with supporting variable
+df <- df %>% 
+  mutate(xy = x * y,
+         x_sq = x ** 2,
+         y_sq = y ** 2)
+n <- nrow(df) # amount of predictor 
+
+# assign `a` value
+a <- (sum(df$y) * sum(df$x_sq) - sum(df$x) * sum(df$xy)) / 
+  (n * sum(df$x_sq) - (sum(df$x))**2)
+
+
+# assign `b` value
+b <- (n * sum(df$xy) - sum(df$x) * sum(df$y)) /
+  (n * sum(df$x_sq) - (sum(df$x))**2)
+
+paste(sprintf("The formula is y = %.3f + %.3fx", a, b))
+
+```
+
+We have got the formula: y = -118.420 + 9.723x.
+Now we calculate the predicted y using this formula
+```{r}
+df$y_pred <- a + (b * df$x)
+df
+```
+We will check the R-squared value.
+This is to check whether the linear regression model will be the good fit for the data
+```{r}
+r <- (n * sum(df$xy) - sum(df$x) * sum(df$y)) / 
+  sqrt ((n * sum(df$x_sq) - (sum(df$x))**2) * (n * sum(df$y_sq) - (sum(df$y))**2))
+
+r_sq <- r ** 2 # this value is called Multiple R Squared
+
+# Meanwhile, adjusted R-squared will be as follow
+k <- 1 # we only have one independent variable
+adjusted_r_sq <- 1 - (((1 - r_sq) * (n - 1)) / (n-k-1))
+
+paste(sprintf("The model fits the data with percentage %.2f%%", adjusted_r_sq*100))
+``` 
+
+As the end of PART 1, let's see how the distribution of data, include with the regression line (predicted value line)
+```{r}
+df %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_point(size = 3) +
+  geom_abline(intercept = a, slope = b, size = 1, color = "blue") + 
+  labs(title = "Data Distribution with Its Regression Line", 
+       x = "Predictor (x)",
+       y = "Target (y)") +
+  annotate(geom = "text", x = 50, y = 450, label = "y = -118.42 + 9.72x")
+```
+
+**PART 2 : FIND THE RESIDUAL**
+
+Residual is the discrepancy between actual y value with predicted y value
+```{r}
+df$residual <- df$y - df$y_pred
+df
+```
+
+In Linear Regression analysis, we will check the distribution of Residual itself
+```{r}
+df %>% 
+  ggplot(aes(x = y, y = residual)) +
+  geom_point(size = 3) + 
+  geom_hline(yintercept = 0, size = 1, color = "red") + 
+  labs(title = "Residual Distribution Plot")
+```
+
+**PART 3 : FIND THE STANDARDIZED RESIDUAL**
+
+Before we check the standardized residual, there are several supporting variable we need to make
+```{r}
+df$residual_sq <- df$residual ** 2
+
+predictor_mean <- mean(df$x)
+df$predictor_sd <- (df$x - predictor_mean) ** 2 # deviation of predictor data
+predictor_ssdev <- sum(df$predictor_sd) # sum of square of predictor standard deviation 
+
+RSE <- sqrt(sum(df$residual_sq) / (n-k-1))
+```
+
+We start by counting the leverage; which by definition, is how far an observation value, from those of the other observations.
+```{r}
+df$leverage <- (1/n) + (((df$x - predictor_mean) ** 2) / predictor_ssdev)
+df
+```
+
+Then, we calculate the Standardized Residuals
+```{r}
+df$residual_std <- df$residual / (RSE * sqrt(1 - df$leverage))
+df
+```
+
+In R, we can plot standardized residual with qqplot directly.
+However, here we want to know where the calculation is from. 
+Let's start by making another dataset.
+```{r}
+# sort the value of Standardized Residuals
+qq_df <- data.frame(residual_std = sort(df$residual_std))
+
+# add rank -> start with 1 for the smallest value
+qq_df$rank <- c(1:n)
+
+# check percentile or quantile -> show the percentage of rank among overall
+qq_df$quantile <- (qq_df$rank - 0.5) / n
+
+# check qnorm of each quantile
+qq_df$qnorm <- qnorm(qq_df$quantile)
+
+qq_df
+```
+
+Plot the data to check normality
+```{r}
+qq_df %>% 
+  ggplot(aes(x = qnorm, y = residual_std)) +
+  geom_point(size = 3) +
+  geom_qq_line(aes(sample = residual_std), line.p = c(0.25, 0.75), size = 1, color = "magenta") + 
+  labs(title = "Normality Plot for Standardized Residuals",
+       x = "Normal Score", 
+       y = "Standardized Residuals")
+```
+
