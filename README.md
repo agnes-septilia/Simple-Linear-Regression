@@ -1,4 +1,4 @@
-# Simple-Linear-Regression - The Formula Breakdown
+# Simple Linear Regression - The Formula Breakdown
 Simple Linear Regression explained in it's formulas. Written in R (.rmd)
 
 Hi! 
